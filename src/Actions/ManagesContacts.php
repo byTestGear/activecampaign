@@ -54,10 +54,10 @@ trait ManagesContacts
      *
      * @return Contact|null
      */
-    public function createContact($email, $firstName, $lastName, $orgid = null)
+    public function createContact($email, $firstName, $lastName, $orgid = null, $phone = null)
     {
         $contacts = $this->transformCollection(
-            $this->post('contacts', ['json' => ['contact' => compact('email', 'firstName', 'lastName', 'orgid')]]),
+            $this->post('contacts', ['json' => ['contact' => compact('email', 'firstName', 'lastName', 'orgid', 'phone')]]),
             Contact::class
         );
 
@@ -71,19 +71,21 @@ trait ManagesContacts
      * @param string $firstName
      * @param string $lastName
      * @param int|null $orgid
+     * @param string $phone
      *
      * @return Contact
      */
-    public function findOrCreateContact($email, $firstName, $lastName, $orgid = null)
+    public function findOrCreateContact($email, $firstName, $lastName, $orgid = null, $phone = null)
     {
-        $contact = $this->findContact($email);
+        $contacts = $this->transformCollection(
+            $this->post('contact/sync', ['json' => ['contact' => compact('email', 'firstName', 'lastName', 'orgid', 'phone')]]),
+            Contact::class
+        );
 
-        if ($contact instanceof Contact) {
-            return $contact;
-        }
+        return array_shift($contacts);
 
-        return $this->createContact($email, $firstName, $lastName, $orgid);
     }
+
 
     /**
      * Get all automations of a contact.
@@ -116,6 +118,29 @@ trait ManagesContacts
             'contactTags'
         );
     }
+    
+     /**
+     * Adds an automation to a contact.
+     *
+     * @param \TestMonitor\ActiveCampaign\Resources\Contact $contact
+     * @param \TestMonitor\ActiveCampaign\Resources\Automation $automation
+     */
+    public function addAutomationToContact(Contact $contact, Automation $automation)
+    {
+        $contactAutomations = $this->contactAutomations($contact);
+
+        $contactAutomation = current(array_filter($contactAutomations, function ($contactAutomation) use ($automation) {
+            return $contactAutomation->automation == $automation->id;
+        }));
+
+        if (!empty($contactAutomation)) {
+            return;
+        }
+
+        $data = ['contactAutomation' => ['contact'=>$contact->id, 'automation'=>$automation->id]];
+        $this->post('contactAutomations', ['json' => $data]);
+    }
+
 
     /**
      * Removing a automation from a contact.
